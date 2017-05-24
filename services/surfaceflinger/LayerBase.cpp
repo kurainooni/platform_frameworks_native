@@ -163,6 +163,16 @@ bool LayerBase::setTransparentRegionHint(const Region& transparent) {
     requestTransaction();
     return true;
 }
+
+// rk add
+bool LayerBase::setInvisiableRegionScreenHint(const Region& invisiable) {
+
+    mCurrentState.sequence++;
+    mCurrentState.invisiableRegionScreen = invisiable;
+    requestTransaction();
+    return true;
+}
+
 bool LayerBase::setFlags(uint8_t flags, uint8_t mask) {
     const uint32_t newFlags = (mCurrentState.flags & ~mask) | (flags & mask);
     if (mCurrentState.flags == newFlags)
@@ -229,6 +239,24 @@ uint32_t LayerBase::doTransaction(uint32_t flags)
     commitTransaction();
     return flags;
 }
+//>>>>>>>add by qiuen
+void LayerBase::setVertices( GLfloat  vertices[4][2])
+{
+     const DisplayHardware& hw(graphicPlane(0).displayHardware());
+
+     for (size_t i=0 ; i<4 ; i++)
+     {
+        mVertices[i][0] = vertices[i][0];
+	mVertices[i][1] = vertices[i][1];
+     }
+
+        for (size_t i=0 ; i<4 ; i++)
+        mVertices[i][1] = hw.getHeight() - mVertices[i][1];
+        
+
+}
+
+//<<<<<<<<<<<<<<<
 
 void LayerBase::validateVisibility(const Transform& planeTransform)
 {
@@ -249,8 +277,10 @@ void LayerBase::validateVisibility(const Transform& planeTransform)
     tr.transform(mVertices[1], win.left,  win.bottom);
     tr.transform(mVertices[2], win.right, win.bottom);
     tr.transform(mVertices[3], win.right, win.top);
+
     for (size_t i=0 ; i<4 ; i++)
         mVertices[i][1] = hw_h - mVertices[i][1];
+
 
     if (CC_UNLIKELY(transformed)) {
         // NOTE: here we could also punt if we have too many rectangles
@@ -266,12 +296,28 @@ void LayerBase::validateVisibility(const Transform& planeTransform)
     } else {
         transparentRegionScreen = s.transparentRegion;
     }
+	//isTreatTransparentAsInvisiable()
+     if(isTreatTransparentAsInvisiable()) {
+	
+	       Region region(s.invisiableRegionScreen);
+	       Rect bounds = s.transform.makeBounds(s.active.w, s.active.h);
+	       region.andSelf(bounds);
+	       region = region.translate(-s.transform.tx(), -s.transform.ty());
+	       invisiableRegionScreen = tr.transform(region);
+#if 0
+	    if (invisiableRegionScreen.getBounds().getHeight()>0)
+	    {
+		 //   ALOGD("55555555555555,(%f,%f)(%f,%f)(%f,%f)(%f,%f)", mVertices[0][0],mVertices[0][1],mVertices[1][0],mVertices[1][1],mVertices[2][0],mVertices[2][1],mVertices[3][0],mVertices[3][1]);
+	    }
+#endif
+    }  
 
     // cache a few things...
     mOrientation = tr.getOrientation();
     mPlaneOrientation = planeTransform.getOrientation();
     mTransform = tr;
     mTransformedBounds = tr.transform(win);
+	
 }
 
 void LayerBase::lockPageFlip(bool& recomputeVisibleRegions) {
@@ -299,10 +345,12 @@ void LayerBase::setGeometry(hwc_layer_t* hwcl)
         hwcl->transform = finalTransform;
     }
 
-    if (!isOpaque()) {
+
+    if (!isOpaque() || s.alpha < 0xFF ) {
         hwcl->blending = mPremultipliedAlpha ?
                 HWC_BLENDING_PREMULT : HWC_BLENDING_COVERAGE;
     }
+	hwcl->blending |= s.alpha<<16;
 
     // scaling is already applied in mTransformedBounds
     hwcl->displayFrame.left   = mTransformedBounds.left;
@@ -318,6 +366,17 @@ void LayerBase::setGeometry(hwc_layer_t* hwcl)
     hwcl->sourceCrop.top    = 0;
     hwcl->sourceCrop.right  = mTransformedBounds.width();
     hwcl->sourceCrop.bottom = mTransformedBounds.height();
+#ifdef HWC_Layer_DEBUG
+	int strlens ;
+	strlens = strlen(getName().string());
+	strlens = strlens > LayerNameLength ? LayerNameLength:strlens;
+	if(strlens)
+	{
+		memcpy(hwcl->LayerName,getName().string(),strlens);
+		hwcl->LayerName[strlens] = 0;
+	}
+#endif
+    
 }
 
 void LayerBase::setPerFrameData(hwc_layer_t* hwcl) {
@@ -343,6 +402,7 @@ void LayerBase::draw(const Region& clip) const
 void LayerBase::drawForSreenShot()
 {
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
+
     setFiltering(true);
     onDraw( Region(hw.bounds()) );
     setFiltering(false);
@@ -406,11 +466,23 @@ void LayerBase::drawWithOpenGL(const Region& clip) const
     if (!s.active.crop.isEmpty()) {
         crop = s.active.crop;
     }
+
+
     GLfloat left = GLfloat(crop.left) / GLfloat(s.active.w);
     GLfloat top = GLfloat(crop.top) / GLfloat(s.active.h);
     GLfloat right = GLfloat(crop.right) / GLfloat(s.active.w);
     GLfloat bottom = GLfloat(crop.bottom) / GLfloat(s.active.h);
 
+/*   if (isTreatTransparentAsInvisiable() && strcmp(getName().string(), "SurfaceView")==0)
+   {
+         if (clip.getBounds().right-clip.getBounds().left>100)
+         {
+	      	ALOGD("444444444444,(%f,%f)(%f,%f)(%f,%f)(%f,%f)", mVertices[0][0],mVertices[0][1],mVertices[1][0],mVertices[1][1],mVertices[2][0],mVertices[2][1],mVertices[3][0],mVertices[3][1]);	
+	 }
+
+   }*/
+ 
+   
     TexCoords texCoords[4];
     texCoords[0].u = left;
     texCoords[0].v = top;

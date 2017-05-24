@@ -89,7 +89,7 @@ public:
     //
     // This call may only be made while the OpenGL ES context to which the
     // target texture belongs is bound to the calling thread.
-    status_t updateTexImage();
+    status_t updateTexImage(bool checkFirstFrame=false);
 
     // setBufferCountServer set the buffer count. If the client has requested
     // a buffer count using setBufferCount, the server-buffer count will
@@ -248,7 +248,7 @@ private:
         virtual ~BufferRejecter() { }
     };
     friend class Layer;
-    status_t updateTexImage(BufferRejecter* rejecter);
+    status_t updateTexImage(BufferRejecter* rejecter, bool checkFirstFrame=false);
 
     // createImage creates a new EGLImage from a GraphicBuffer.
     EGLImageKHR createImage(EGLDisplay dpy,
@@ -412,6 +412,7 @@ private:
     // variables of SurfaceTexture objects. It must be locked whenever the
     // member variables are accessed.
     mutable Mutex mMutex;
+
 };
 
 // ----------------------------------------------------------------------------

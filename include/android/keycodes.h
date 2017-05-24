@@ -263,6 +263,19 @@ enum {
     AKEYCODE_RO              = 217,
     AKEYCODE_KANA            = 218,
     AKEYCODE_ASSIST          = 219,
+//gyq 
+    KEYCODE_SETTINGSSS       = 221,
+		KEYCODE_EMAIL            = 222,
+		KEYCODE_WIFISETTING      = 223,
+		KEYCODE_ETHERNETSETTING  = 224,
+		KEYCODE_APKINSTALLER     = 225,
+		KEYCODE_RKVIDEOPLAYER    = 226,
+		KEYCODE_GALLERY          = 227,
+		KEYCODE_SCREENSHOT       = 228,
+		KEYCODE_SOUNDRECODER     = 229,
+		KEYCODE_AIRISSUPPORT     = 230,
+		KEYCODE_CALLSOFTKEYBOARD = 231,
+		KEYCODE_USERKEY01        = 232,
 
     // NOTE: If you add a new keycode here you must also add it to several other files.
     //       Refer to frameworks/base/core/java/android/view/KeyEvent.java for the full list.

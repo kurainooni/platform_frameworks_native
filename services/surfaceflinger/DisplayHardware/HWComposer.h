@@ -69,6 +69,9 @@ public:
     // commits the list
     status_t commit() const;
 
+    // close the overlay fd
+    status_t overlayClose() const;
+
     // release hardware resources
     status_t release() const;
 

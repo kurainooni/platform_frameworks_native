@@ -70,10 +70,34 @@ void LayerScreenshot::initTexture(GLfloat u, GLfloat v) {
     glBindTexture(GL_TEXTURE_2D, mTextureName);
     glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    mTexCoords[0] = 0;         mTexCoords[1] = v;
-    mTexCoords[2] = 0;         mTexCoords[3] = 0;
-    mTexCoords[4] = u;         mTexCoords[5] = 0;
-    mTexCoords[6] = u;         mTexCoords[7] = v;
+
+    switch (graphicPlane(0).getHardwareOrientation()) {
+    case 0:
+        mTexCoords[0] = 0;         mTexCoords[1] = v;
+        mTexCoords[2] = 0;         mTexCoords[3] = 0;
+        mTexCoords[4] = u;         mTexCoords[5] = 0;
+        mTexCoords[6] = u;         mTexCoords[7] = v;
+        break;
+    case 180:
+        mTexCoords[0] = u;         mTexCoords[1] = 0;
+        mTexCoords[2] = u;         mTexCoords[3] = v;
+        mTexCoords[4] = 0;         mTexCoords[5] = v;
+        mTexCoords[6] = 0;         mTexCoords[7] = 0;
+        break;
+
+    case 90:
+        mTexCoords[0] = u;         mTexCoords[1] = v;
+        mTexCoords[2] = 0;         mTexCoords[3] = v;
+        mTexCoords[4] = 0;         mTexCoords[5] = 0;
+        mTexCoords[6] = u;         mTexCoords[7] = 0;
+        break;
+    case 270:
+        mTexCoords[0] = 0;         mTexCoords[1] = 0;
+        mTexCoords[2] = u;         mTexCoords[3] = 0;
+        mTexCoords[4] = u;         mTexCoords[5] = v;
+        mTexCoords[6] = 0;         mTexCoords[7] = v;
+        break;
+    }
 }
 
 void LayerScreenshot::initStates(uint32_t w, uint32_t h, uint32_t flags) {
@@ -121,13 +145,21 @@ void LayerScreenshot::onDraw(const Region& clip) const
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         }
 
+#ifdef TARGET_RK30
+        glColor4f(1, 1, 1, alpha);
+#else
         glColor4f(0, 0, 0, alpha);
+#endif
 
         glDisable(GL_TEXTURE_EXTERNAL_OES);
         glEnable(GL_TEXTURE_2D);
 
         glBindTexture(GL_TEXTURE_2D, mTextureName);
+#ifdef TARGET_RK30
+        glTexEnvx(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+#else
         glTexEnvx(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+#endif
         glMatrixMode(GL_TEXTURE);
         glLoadIdentity();
         glMatrixMode(GL_MODELVIEW);

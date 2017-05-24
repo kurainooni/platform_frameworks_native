@@ -50,6 +50,7 @@ public:
         eOpaque             = 0x00000400,
         eProtectedByApp     = 0x00000800,
         eProtectedByDRM     = 0x00001000,
+        eTransparentAsInvisiable = 0x00002000,//rk add
 
         eFXSurfaceNormal    = 0x00000000,
         eFXSurfaceBlur      = 0x00010000,
@@ -67,6 +68,7 @@ public:
         eTransparentRegionChanged   = 0x00000020,
         eVisibilityChanged          = 0x00000040,
         eFreezeTintChanged          = 0x00000080,
+        eInvisiableRegionScreenChanged = 0x00000100,//rk add
         eCropChanged                = 0x00000100,
     };
 

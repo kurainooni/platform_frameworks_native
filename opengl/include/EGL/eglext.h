@@ -229,6 +229,21 @@ struct ANativeWindowBuffer;
 #define EGL_NATIVE_BUFFER_ANDROID               0x3140  /* eglCreateImageKHR target */
 #endif
 
+// add by cf
+#ifndef EGL_ANDROID_get_render_buffer
+#define EGL_ANDROID_get_render_buffer 1
+#ifdef EGL_EGLEXT_PROTOTYPES
+EGLAPI EGLClientBuffer EGLAPIENTRY eglGetRenderBufferANDROID(EGLDisplay dpy, EGLSurface draw);
+EGLAPI EGLBoolean EGLAPIENTRY eglRenderBufferModifiedANDROID(EGLDisplay dpy, EGLSurface draw);
+#endif
+typedef EGLClientBuffer (EGLAPIENTRYP PFNEGLGETRENDERBUFFERANDROIDPROC) (EGLDisplay dpy, EGLSurface draw);
+typedef EGLBoolean (EGLAPIENTRYP PFNEGLRENDERBUFFERMODIFYEDANDROIDPROC) (EGLDisplay dpy, EGLSurface draw);
+
+#endif
+
+EGLAPI void EGLAPIENTRY eglSetImplementationAndroid(EGLBoolean impl);
+typedef void (EGLAPIENTRYP PFNEGLSETIMPLEMENTATIONANDROIDPROC) (EGLBoolean impl);
+
 #ifndef EGL_ANDROID_recordable
 #define EGL_ANDROID_recordable 1
 #define EGL_RECORDABLE_ANDROID                  0x3142  /* EGLConfig attribute */

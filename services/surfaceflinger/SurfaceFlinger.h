@@ -115,7 +115,8 @@ public:
 
         void                    setDisplayHardware(DisplayHardware *);
         status_t                setOrientation(int orientation);
-        int                     getOrientation() const { return mOrientation; }
+        int                     getOrientation() const  { return mOrientation; }
+        int                     getHardwareOrientation() const { return mHardwareOrientation; }
         int                     getWidth() const;
         int                     getHeight() const;
 
@@ -132,6 +133,7 @@ private:
         Transform               mGlobalTransform;
         Transform               mDisplayTransform;
         int                     mOrientation;
+        int                     mHardwareOrientation;
         float                   mDisplayWidth;
         float                   mDisplayHeight;
         int                     mWidth;
@@ -350,6 +352,7 @@ private:
 
             void        debugFlashRegions();
             void        drawWormhole() const;
+            void        debugShowFPS() const;
 
             void        startBootAnim();
 
@@ -407,6 +410,7 @@ private:
                 int                         mDebugDDMS;
                 int                         mDebugDisableHWC;
                 int                         mDebugDisableTransformHint;
+                int                         mDebugFPS;
                 volatile nsecs_t            mDebugInSwapBuffers;
                 nsecs_t                     mLastSwapBufferTime;
                 volatile nsecs_t            mDebugInTransaction;
@@ -423,6 +427,13 @@ private:
 
    // only written in the main thread, only read in other threads
    volatile     int32_t                     mSecureFrameBuffer;
+//#ifdef TARGET_RK30
+   
+   struct   tVPU_FRAME                      mFrameHead[2];	
+   void     *                               mHadBase[2];
+   int                                      mHadIndex;                                          
+//#endif   
+
 };
 
 // ---------------------------------------------------------------------------

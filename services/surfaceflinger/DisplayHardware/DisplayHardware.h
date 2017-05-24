@@ -78,6 +78,12 @@ public:
     int         getHeight() const;
     PixelFormat getFormat() const;
     uint32_t    getFlags() const;
+#ifdef TARGET_RK30      
+    void        RenderVPUBuffToLayerBuff(  hwc_layer_t * Layer) const;
+    void        SetLastBuffAddr( int value) const;
+    mutable  int         LastBuffAddr;
+#endif    
+    
     uint32_t    getMaxTextureSize() const;
     uint32_t    getMaxViewportDims() const;
     nsecs_t     getRefreshPeriod() const;
@@ -148,5 +154,17 @@ private:
 };
 
 }; // namespace android
+
+
+//#ifdef TARGET_RK30
+
+struct tVPU_FRAME
+{
+    uint32_t          FrameBusAddr[2];    // 0: Y address; 1: UV address;
+    uint32_t         FrameWidth;         // 16 aligned frame width
+    uint32_t         FrameHeight;        // 16 aligned frame height
+};
+//#endif
+
 
 #endif // ANDROID_DISPLAY_HARDWARE_H

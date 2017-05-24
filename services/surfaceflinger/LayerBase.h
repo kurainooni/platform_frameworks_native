@@ -63,6 +63,7 @@ public:
             Region      visibleRegionScreen;
             Region      transparentRegionScreen;
             Region      coveredRegionScreen;
+	    Region      invisiableRegionScreen;//rk add
             int32_t     sequence;
             
             struct Geometry {
@@ -87,6 +88,7 @@ public:
                 int32_t         sequence;   // changes when visible regions can change
                 Transform       transform;
                 Region          transparentRegion;
+		Region                  invisiableRegionScreen;//rk add, invisiableRegion
             };
 
     virtual void setName(const String8& name);
@@ -99,6 +101,7 @@ public:
             bool setAlpha(uint8_t alpha);
             bool setMatrix(const layer_state_t::matrix22_t& matrix);
             bool setTransparentRegionHint(const Region& opaque);
+	    bool setInvisiableRegionScreenHint(const Region& invisiable); //rk add 
             bool setFlags(uint8_t flags, uint8_t mask);
             bool setCrop(const Rect& crop);
             
@@ -178,6 +181,12 @@ public:
      * correct.
      */
     virtual void unlockPageFlip(const Transform& planeTransform, Region& outDirtyRegion);
+
+        /**
+     * rk add
+     * true if this surface need force to treat transparent region as invisiable region , even it is not transparent format
+     */
+    virtual bool isTreatTransparentAsInvisiable() const  { return false; }
     
     /**
      * isOpaque - true if this surface is opaque
@@ -240,6 +249,12 @@ public:
     int32_t  getPlaneOrientation() const { return mPlaneOrientation; }
 
     void clearWithOpenGL(const Region& clip) const;
+
+
+    //>>>>>>>>>>>add by qiuen
+        void setVertices( GLfloat   vertices[4][2]);
+
+    //<<<<<<<
 
 protected:
     const GraphicPlane& graphicPlane(int dpy) const;
@@ -313,6 +328,7 @@ public:
     virtual const char* getTypeId() const { return "LayerBaseClient"; }
 
     uint32_t getIdentity() const { return mIdentity; }
+ 
 
 protected:
     virtual void dump(String8& result, char* scratch, size_t size) const;

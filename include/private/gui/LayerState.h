@@ -69,6 +69,8 @@ struct layer_state_t {
             Rect            crop;
             // non POD must be last. see write/read
             Region          transparentRegion;
+	    
+	    Region                  invisiableRegionScreen;//add by rk
 };
 
 struct ComposerState {

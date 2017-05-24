@@ -63,6 +63,7 @@
 #include <private/android_filesystem_config.h>
 #include <private/gui/SharedBufferStack.h>
 #include <gui/BitTube.h>
+#include "Transform.h"
 
 #define EGL_VERSION_HW_ANDROID  0x3143
 
@@ -91,6 +92,7 @@ SurfaceFlinger::SurfaceFlinger()
         mDebugDDMS(0),
         mDebugDisableHWC(0),
         mDebugDisableTransformHint(0),
+        mDebugFPS(0),
         mDebugInSwapBuffers(0),
         mLastSwapBufferTime(0),
         mDebugInTransaction(0),
@@ -119,6 +121,10 @@ void SurfaceFlinger::init()
     }
 #endif
 
+    property_get("debug.sf.fps", value, "0");
+    mDebugFPS = atoi(value);
+
+	mHadIndex = 0;
     ALOGI_IF(mDebugRegion,       "showupdates enabled");
     ALOGI_IF(mDebugDDMS,         "DDMS debugging enabled");
 }
@@ -411,6 +417,8 @@ void SurfaceFlinger::onMessageReceived(int32_t what)
     ATRACE_CALL();
     switch (what) {
         case MessageQueue::REFRESH: {
+
+
 //        case MessageQueue::INVALIDATE: {
             // if we're in a global transaction, don't do anything.
             const uint32_t mask = eTransactionNeeded | eTraversalNeeded;
@@ -446,7 +454,19 @@ void SurfaceFlinger::onMessageReceived(int32_t what)
                 handleRepaint();
                 // inform the h/w that we're done compositing
                 hw.compositionComplete();
+              
                 postFramebuffer();
+               
+                for(int i= 0; i< mHadIndex;i++)
+                {
+                	//ALOGD(" restore the data addr=%p,width=%d,height=%d",mHadBase[i],mFrameHead[i].FrameWidth,mFrameHead[i].FrameHeight);
+                	memcpy((void*)mHadBase[i],&mFrameHead[i],sizeof(tVPU_FRAME));					  					                
+                }
+               
+				mHadIndex = 0;
+                if (CC_UNLIKELY(mDebugFPS)) {
+                    debugShowFPS();
+                }
             } else {
                 // pretend we did the post
                 hw.compositionComplete();
@@ -455,6 +475,24 @@ void SurfaceFlinger::onMessageReceived(int32_t what)
         } break;
     }
 }
+
+void SurfaceFlinger::debugShowFPS() const
+{
+    static int mFrameCount;
+    static int mLastFrameCount = 0;
+    static nsecs_t mLastFpsTime = 0;
+    static float mFps = 0;
+    mFrameCount++;
+    nsecs_t now = systemTime();
+    nsecs_t diff = now - mLastFpsTime;
+    if (diff > ms2ns(500)) {
+        mFps =  ((mFrameCount - mLastFrameCount) * float(s2ns(1))) / diff;
+        mLastFpsTime = now;
+        mLastFrameCount = mFrameCount;
+        ALOGD("mFps = %2.3f", mFps);
+    }
+    // XXX: mFPS has the value we want
+ }
 
 void SurfaceFlinger::postFramebuffer()
 {
@@ -632,7 +670,13 @@ void SurfaceFlinger::computeVisibleRegions(
                 if (translucent) {
                     visibleRegion.subtractSelf(layer->transparentRegionScreen);
                 }
-
+                //>>>>>>>>add by qiuen
+		if (layer->invisiableRegionScreen.getBounds().getHeight()>0)
+		{
+			visibleRegion.subtractSelf(layer->invisiableRegionScreen);
+			//ALOGD(">>>>>>>>>>>>>isTreatTransparentAsInvisiable visibleRegion,name=%s,l=%d,t=%d,r=%d,b=%d",layer->getName().string(),visibleRegion.getBounds().left, visibleRegion.getBounds().top,visibleRegion.getBounds().right,visibleRegion.getBounds().bottom);
+		}
+		//<<<<<<<<<<<<<<<<
                 // compute the opaque region
                 const int32_t layerOrientation = layer->getOrientation();
                 if (s.alpha==255 && !translucent &&
@@ -686,11 +730,11 @@ void SurfaceFlinger::computeVisibleRegions(
         // Update aboveOpaqueLayers for next (lower) layer
         aboveOpaqueLayers.orSelf(opaqueRegion);
 
+
         // Store the visible region is screen space
         layer->setVisibleRegion(visibleRegion);
         layer->setCoveredRegion(coveredRegion);
-
-        // If a secure layer is partially visible, lock-down the screen!
+	// If a secure layer is partially visible, lock-down the screen!
         if (layer->isSecure() && !visibleRegion.isEmpty()) {
             secureFrameBuffer = true;
         }
@@ -897,6 +941,15 @@ void SurfaceFlinger::setupHardwareComposer()
     ALOGE_IF(err, "HWComposer::prepare failed (%s)", strerror(-err));
 }
 
+#ifdef TARGET_RK30
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    
+#include <hardware/hal_public.h>
+#define private_handle_t IMG_native_handle_t
+#else
+#include "../../../../hardware/rk29/libgralloc_ump/gralloc_priv.h"
+#endif
+#endif
+
 void SurfaceFlinger::composeSurfaces(const Region& dirty)
 {
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
@@ -929,6 +982,9 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
 
         const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
         const size_t count = layers.size();
+#ifdef TARGET_RK30    
+	struct private_handle_t* srchnd = NULL;;
+#endif
 
         for (size_t i=0 ; i<count ; i++) {
             const sp<LayerBase>& layer(layers[i]);
@@ -944,10 +1000,64 @@ void SurfaceFlinger::composeSurfaces(const Region& dirty)
                     continue;
                 }
                 // render the layer
+#ifdef TARGET_RK30    
+
+				if(cur && (!cur[i].flags & HWC_SKIP_LAYER) && (hwc.initCheck() == NO_ERROR))  
+				//if(cur && cur[i].handle != NULL && (hwc.initCheck() == NO_ERROR))   				
+				{
+					srchnd = (struct private_handle_t *) cur[i].handle;
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    					
+					if( srchnd && (srchnd->iFormat == HAL_PIXEL_FORMAT_YCrCb_NV12_VIDEO))
+#else
+					if( srchnd && (srchnd->format == HAL_PIXEL_FORMAT_YCrCb_NV12_VIDEO))
+#endif
+					{			
+						//struct tVPU_FRAME FrameHead;	
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    											
+						memcpy(&mFrameHead[mHadIndex],(void*)srchnd->iBase,sizeof(tVPU_FRAME));
+#else
+						memcpy(&mFrameHead[mHadIndex],(void*)srchnd->base,sizeof(tVPU_FRAME));
+#endif
+						hw.RenderVPUBuffToLayerBuff(&cur[i]);	
+						const Region clip(dirty.intersect(layer->visibleRegionScreen));
+						if (!clip.isEmpty()) {
+						 	
+							layer->draw(clip);
+						}
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    																	
+						mHadBase[mHadIndex] = (void*)srchnd->iBase;
+#else
+						mHadBase[mHadIndex] = (void*)srchnd->base;
+
+#endif
+	                	//ALOGD(" store the data addx=%p,width=%d,height=%d",mHadBase[mHadIndex],mFrameHead[mHadIndex].FrameWidth,mFrameHead[mHadIndex].FrameHeight);
+						
+						mHadIndex ++;						
+						continue;
+					}
+
+				}
+#endif
+			 	
                 layer->draw(clip);
             }
         }
     }
+//#ifdef TARGET_RK30  
+#if 0
+    const Vector< sp<LayerBase> >& layers(mVisibleLayersSortedByZ);
+    const size_t count = layers.size();
+
+    for (size_t i=0 ; i<count ; i++) 
+    {
+        const sp<LayerBase>& layer(layers[i]);
+      	if(!strcmp("com.antutu.ABenchMark/com.antutu.ABenchMark.ABenchMarkTab",layer->getName().string()))
+      	{
+      		//usleep(55000);
+      		//break;
+      	}
+    }
+#endif
 }
 
 void SurfaceFlinger::debugFlashRegions()
@@ -990,7 +1100,7 @@ void SurfaceFlinger::debugFlashRegions()
         glVertexPointer(2, GL_FLOAT, 0, vertices);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     }
-
+    hw.compositionComplete();
     hw.flip(mSwapRegion);
 
     if (mDebugRegion > 1)
@@ -1007,21 +1117,26 @@ void SurfaceFlinger::drawWormhole() const
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_BLEND);
     glColor4f(0,0,0,0);
-
     GLfloat vertices[4][2];
     glVertexPointer(2, GL_FLOAT, 0, vertices);
     Region::const_iterator it = region.begin();
     Region::const_iterator const end = region.end();
+    
+    // add by huagnds for opengl initial point in left bottom,not in left top
+    const DisplayHardware& hw(graphicPlane(0).displayHardware());    
+    const int32_t height = hw.getHeight();
+
     while (it != end) {
         const Rect& r = *it++;
+        const GLint sy = height - (r.top + r.height());
         vertices[0][0] = r.left;
-        vertices[0][1] = r.top;
+        vertices[0][1] = sy;//r.top;     modify by huagnds for opengl initial point in left bottom,not in left top
         vertices[1][0] = r.right;
-        vertices[1][1] = r.top;
+        vertices[1][1] = sy;//r.top;    modify by huagnds for opengl initial point in left bottom,not in left top
         vertices[2][0] = r.right;
-        vertices[2][1] = r.bottom;
+        vertices[2][1] = height - r.top; //r.bottom  modify by huagnds for opengl initial point in left bottom,not in left top
         vertices[3][0] = r.left;
-        vertices[3][1] = r.bottom;
+        vertices[3][1] = height - r.top; //r.bottom   modify by huagnds for opengl initial point in left bottom,not in left top
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     }
 }
@@ -1287,6 +1402,11 @@ status_t SurfaceFlinger::removeSurface(const sp<Client>& client, SurfaceID sid)
     sp<LayerBaseClient> layer = client->getLayerUser(sid);
 
     if (layer != 0) {
+        if(strcmp(layer->getName(), "android.rk.RockVideoPlayer.VideoDisplayView") == 0){
+                const DisplayHardware& hw(graphicPlane(0).displayHardware());
+                HWComposer& hwc(hw.getHwComposer());
+                hwc.overlayClose();
+        }
         err = purgatorizeLayer_l(layer);
         if (err == NO_ERROR) {
             setTransactionFlags(eTransactionNeeded);
@@ -1356,6 +1476,12 @@ uint32_t SurfaceFlinger::setClientStateLocked(
             if (layer->setTransparentRegionHint(s.transparentRegion))
                 flags |= eTraversalNeeded;
         }
+         //rk add
+     if (what & eInvisiableRegionScreenChanged) {
+           
+             if (layer->setInvisiableRegionScreenHint(s.invisiableRegionScreen))
+                flags |= eTraversalNeeded;
+      }
         if (what & eVisibilityChanged) {
             if (layer->setFlags(s.flags, s.mask))
                 flags |= eTraversalNeeded;
@@ -1798,6 +1924,15 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(DisplayID dpy,
     GLfloat u = 1;
     GLfloat v = 1;
 
+#ifdef TARGET_RK30    
+
+    HWComposer& hwc(hw.getHwComposer());
+
+    hwc_layer_t* const cur(hwc.getLayers());
+
+	struct private_handle_t* srchnd = NULL;;
+#endif
+
     // make sure to clear all GL error flags
     while ( glGetError() != GL_NO_ERROR ) ;
 
@@ -1807,14 +1942,25 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(DisplayID dpy,
     glBindTexture(GL_TEXTURE_2D, tname);
     glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+#ifdef TARGET_RK30
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+            hw_w, hw_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+#else
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
             hw_w, hw_h, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+#endif
     if (glGetError() != GL_NO_ERROR) {
         while ( glGetError() != GL_NO_ERROR ) ;
         GLint tw = (2 << (31 - clz(hw_w)));
         GLint th = (2 << (31 - clz(hw_h)));
+#ifdef TARGET_RK30
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                tw, th, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+#else
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                 tw, th, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+#endif
         u = GLfloat(hw_w) / tw;
         v = GLfloat(hw_h) / th;
     }
@@ -1834,6 +1980,37 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(DisplayID dpy,
     const size_t count = layers.size();
     for (size_t i=0 ; i<count ; ++i) {
         const sp<LayerBase>& layer(layers[i]);
+#ifdef TARGET_RK30    
+		if(cur && (!cur[i].flags & HWC_SKIP_LAYER) && (hwc.initCheck() == NO_ERROR))   
+		{
+			
+			srchnd = (struct private_handle_t *) cur[i].handle;	
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    								
+			if( srchnd && (srchnd->iFormat == HAL_PIXEL_FORMAT_YCrCb_NV12_VIDEO))
+#else
+			if( srchnd && (srchnd->format == HAL_PIXEL_FORMAT_YCrCb_NV12_VIDEO))
+#endif
+			{			
+			
+				struct tVPU_FRAME FrameHead;	
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    												
+				memcpy(&FrameHead,(void*)srchnd->iBase,sizeof(tVPU_FRAME));
+#else
+				memcpy(&FrameHead,(void*)srchnd->base,sizeof(tVPU_FRAME));
+#endif
+				hw.RenderVPUBuffToLayerBuff(&cur[i]);	
+				layer->drawForSreenShot();
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    																
+				memcpy((void*)srchnd->iBase,&FrameHead,sizeof(tVPU_FRAME));
+#else
+				memcpy((void*)srchnd->base,&FrameHead,sizeof(tVPU_FRAME));
+#endif
+				continue;
+			}
+
+		}
+#endif
+        
         layer->drawForSreenShot();
     }
 
@@ -2688,10 +2865,14 @@ void GraphicPlane::setDisplayHardware(DisplayHardware *hw)
     int displayOrientation = ISurfaceComposer::eOrientationDefault;
     char property[PROPERTY_VALUE_MAX];
     if (property_get("ro.sf.hwrotation", property, NULL) > 0) {
+        mHardwareOrientation = atoi(property);
         //displayOrientation
-        switch (atoi(property)) {
+        switch (mHardwareOrientation) {
         case 90:
             displayOrientation = ISurfaceComposer::eOrientation90;
+            break;
+        case 180:
+            displayOrientation = ISurfaceComposer::eOrientation180;
             break;
         case 270:
             displayOrientation = ISurfaceComposer::eOrientation270;
@@ -2738,11 +2919,12 @@ status_t GraphicPlane::orientationToTransfrom(
     return NO_ERROR;
 }
 
+
+
 status_t GraphicPlane::setOrientation(int orientation)
 {
     // If the rotation can be handled in hardware, this is where
     // the magic should happen.
-
     const DisplayHardware& hw(displayHardware());
     const float w = mDisplayWidth;
     const float h = mDisplayHeight;
@@ -2756,7 +2938,6 @@ status_t GraphicPlane::setOrientation(int orientation)
         mWidth = int(h);
         mHeight = int(w);
     }
-
     mOrientation = orientation;
     mGlobalTransform = mDisplayTransform * orientationTransform;
     return NO_ERROR;

@@ -28,8 +28,11 @@
 #include <ui/ANativeObjectBase.h>
 #include <ui/Rect.h>
 
+#ifdef TARGET_RK30    
+#define NUM_FRAME_BUFFERS  3
+#else
 #define NUM_FRAME_BUFFERS  2
-
+#endif
 extern "C" EGLNativeWindowType android_createDisplaySurface(void);
 
 // ---------------------------------------------------------------------------

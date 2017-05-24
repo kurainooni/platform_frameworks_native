@@ -24,12 +24,24 @@ namespace android {
 status_t layer_state_t::write(Parcel& output) const
 {
     status_t err;
+	
+	/* rk change begin */
+     size_t len = invisiableRegionScreen.write(NULL, 0);
+     err = output.writeInt32(len);
+     if (err < NO_ERROR) return err;
+ 
+     void* buf = output.writeInplace(len);
+     if (buf == NULL) return NO_MEMORY;
+ 
+	err = invisiableRegionScreen.write(buf, len);
+	if (err < NO_ERROR) return err;
+	/* rk change end */
 
-    size_t len = transparentRegion.write(NULL, 0);
+    len = transparentRegion.write(NULL, 0);
     err = output.writeInt32(len);
     if (err < NO_ERROR) return err;
 
-    void* buf = output.writeInplace(len);
+    buf = output.writeInplace(len);
     if (buf == NULL) return NO_MEMORY;
 
     err = transparentRegion.write(buf, len);
@@ -37,6 +49,11 @@ status_t layer_state_t::write(Parcel& output) const
 
     // NOTE: regions are at the end of the structure
     size_t size = sizeof(layer_state_t);
+
+    /* rk change begin */
+   size -= sizeof(invisiableRegionScreen);
+   /* rk change end */
+   
     size -= sizeof(transparentRegion);
     err = output.write(this, size);
     return err;
@@ -45,8 +62,17 @@ status_t layer_state_t::write(Parcel& output) const
 status_t layer_state_t::read(const Parcel& input)
 {
     status_t err;
+    /* rk change begin */
     size_t len = input.readInt32();
     void const* buf = input.readInplace(len);
+    if (buf == NULL) return NO_MEMORY;
+
+    err = invisiableRegionScreen.read(buf);
+    if (err < NO_ERROR) return err;
+    /* rk change end */
+	
+    len = input.readInt32();
+    buf = input.readInplace(len);
     if (buf == NULL) return NO_MEMORY;
 
     err = transparentRegion.read(buf);
@@ -54,6 +80,9 @@ status_t layer_state_t::read(const Parcel& input)
 
     // NOTE: regions are at the end of the structure
     size_t size = sizeof(layer_state_t);
+        /* rk change begin */
+    size -= sizeof(invisiableRegionScreen);
+    /* rk change end */
     size -= sizeof(transparentRegion);
     input.read(this, size);
     return NO_ERROR;

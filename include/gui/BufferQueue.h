@@ -257,6 +257,10 @@ public:
     // setTransformHint bakes in rotation to buffers so overlays can be used
     status_t setTransformHint(uint32_t hint);
 
+    //>>>>>>add by qiuen
+    uint64_t getFrameCounter();
+   //<<<<<<<<<
+
 private:
     // freeBufferLocked frees the resources (both GraphicBuffer and EGLImage)
     // for the given slot.
@@ -482,6 +486,7 @@ private:
 
     // mTransformHint is used to optimize for screen rotations
     uint32_t mTransformHint;
+
 };
 
 // ----------------------------------------------------------------------------

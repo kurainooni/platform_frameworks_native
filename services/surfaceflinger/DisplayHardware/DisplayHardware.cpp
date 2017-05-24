@@ -40,6 +40,21 @@
 #include "HWComposer.h"
 #include "SurfaceFlinger.h"
 
+#ifdef TARGET_RK30
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    
+#include <hardware/hal_public.h>
+#define private_handle_t IMG_native_handle_t
+#else
+#include "../../../../../hardware/rk29/libgralloc_ump/gralloc_priv.h"
+#endif
+#include <hardware/rga.h>
+#include <fcntl.h>
+static int fd_rga = -1;
+#undef ALOGV 
+#define ALOGV(...) 
+
+#endif
+
 using namespace android;
 
 
@@ -238,7 +253,7 @@ void DisplayHardware::init(uint32_t dpy)
             attribs[3] = EGL_SLOW_CONFIG;
         }
     }
-
+	//eglSetImplementationAndroid(EGL_TRUE);
     // TODO: all the extensions below should be queried through
     // eglGetProcAddress().
 
@@ -341,6 +356,7 @@ void DisplayHardware::init(uint32_t dpy)
     ALOGI("GL_MAX_TEXTURE_SIZE = %d", mMaxTextureSize);
     ALOGI("GL_MAX_VIEWPORT_DIMS = %d x %d", mMaxViewportDims[0], mMaxViewportDims[1]);
     ALOGI("flags = %08x", mFlags);
+	property_set("sys.gsflg.version","1.010"); // add rga to render vpu buffer to layerbuffer
 
     // Unbind the context from this thread
     eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -452,7 +468,7 @@ void DisplayHardware::flip(const Region& dirty) const
     }
     
     mPageFlipCount++;
-
+	
     if (mHwc->initCheck() == NO_ERROR) {
         mHwc->commit();
     } else {
@@ -464,6 +480,173 @@ void DisplayHardware::flip(const Region& dirty) const
     //glClearColor(1,0,0,0);
     //glClear(GL_COLOR_BUFFER_BIT);
 }
+
+
+#ifdef TARGET_RK30
+
+void DisplayHardware::RenderVPUBuffToLayerBuff(  hwc_layer_t* Layer) const
+{
+
+
+    struct private_handle_t* srcandle = NULL;	
+	struct tVPU_FRAME *pFrame  = NULL;	
+   	struct rga_req  Rga_Request;
+  	struct timeval tpend1, tpend2 ; 
+	long usec1 = 0;
+
+
+	srcandle = (struct private_handle_t *)Layer->handle;
+	
+  	//if(LastBuffAddr == srcandle->base)
+  		//return;
+  	
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    	
+	pFrame = (tVPU_FRAME *)srcandle->iBase;
+#else
+	pFrame = (tVPU_FRAME *)srcandle->base;
+#endif
+	memset(&Rga_Request,0x0,sizeof(Rga_Request));
+
+	ALOGV("videopFrame addr=%x,FrameWidth=%d,FrameHeight=%d",pFrame->FrameBusAddr[0],pFrame->FrameWidth,pFrame->FrameHeight);
+
+     
+
+    if(fd_rga < 0)      
+		fd_rga = open("/dev/rga",O_RDWR,0);	
+	if(fd_rga < 0)
+	{
+        ALOGE(" rga open err");
+		return;
+	}
+
+    Rga_Request.src.yrgb_addr =  (int)pFrame->FrameBusAddr[0] + 0x60000000;
+    
+    Rga_Request.src.uv_addr  = Rga_Request.src.yrgb_addr + (( pFrame->FrameWidth + 15) & ~15) * ((pFrame->FrameHeight + 15) & ~15);
+    Rga_Request.src.v_addr   =  Rga_Request.src.uv_addr;
+    Rga_Request.src.vir_w =  ((pFrame->FrameWidth + 15) & ~15);
+    Rga_Request.src.vir_h = ((pFrame->FrameHeight + 15) & ~15);
+    Rga_Request.src.format = RK_FORMAT_YCbCr_420_SP;
+    
+  	Rga_Request.src.act_w = pFrame->FrameWidth;//Rga_Request.src.vir_w;
+    Rga_Request.src.act_h = pFrame->FrameHeight;//Rga_Request.src.vir_h;
+    Rga_Request.src.x_offset = 0;
+    Rga_Request.src.y_offset = 0;
+
+ 	ALOGV("src info: yrgb_addr=%x, uv_addr=%x,v_addr=%x,"
+         "vir_w=%d,vir_h=%d,format=%d,"
+         "act_x_y_w_h [%d,%d,%d,%d] ",
+			Rga_Request.src.yrgb_addr, Rga_Request.src.uv_addr ,Rga_Request.src.v_addr,
+			Rga_Request.src.vir_w ,Rga_Request.src.vir_h ,Rga_Request.src.format ,
+			Rga_Request.src.x_offset ,
+			Rga_Request.src.y_offset,
+			Rga_Request.src.act_w ,
+			Rga_Request.src.act_h
+                 
+        );
+
+
+
+#ifdef TARGET_BOARD_PLATFORM_RK30XXB    	
+ 	Rga_Request.dst.yrgb_addr = srcandle->iBase; //dsthandle->base;//(int)(fixInfo.smem_start + dsthandle->offset); 	
+   	Rga_Request.dst.vir_w =   (srcandle->iWidth + 31) & ~31;//((srcandle->iWidth*2 + (8-1)) & ~(8-1))/2 ;  /* 2:RK_FORMAT_RGB_565 ,8:????*///srcandle->width;
+        Rga_Request.dst.vir_h =  srcandle->iHeight; 	    
+	Rga_Request.dst.act_w = srcandle->iWidth;//Rga_Request.dst.vir_w;
+	Rga_Request.dst.act_h = srcandle->iHeight;//Rga_Request.dst.vir_h;
+    
+#else
+	Rga_Request.dst.yrgb_addr = srcandle->base; //dsthandle->base;//(int)(fixInfo.smem_start + dsthandle->offset); 	
+   	Rga_Request.dst.vir_w =   ((srcandle->width*2 + (8-1)) & ~(8-1))/2 ;  /* 2:RK_FORMAT_RGB_565 ,8:????*///srcandle->width;
+    Rga_Request.dst.vir_h = srcandle->height; 	
+	Rga_Request.dst.act_w = srcandle->width;//Rga_Request.dst.vir_w;
+	Rga_Request.dst.act_h = srcandle->height;//Rga_Request.dst.vir_h;
+    
+#endif
+    Rga_Request.dst.uv_addr  = 0;//Rga_Request.dst.yrgb_addr + (( srcandle->width + 15) & ~15) * ((srcandle->height + 15) & ~15);
+    Rga_Request.dst.v_addr   = Rga_Request.dst.uv_addr;
+    Rga_Request.dst.format = RK_FORMAT_RGB_565; 
+    Rga_Request.clip.xmin = 0;
+    Rga_Request.clip.xmax = Rga_Request.dst.vir_w - 1;
+    Rga_Request.clip.ymin = 0;
+    Rga_Request.clip.ymax = Rga_Request.dst.vir_h - 1;
+	Rga_Request.dst.x_offset = 0;
+	Rga_Request.dst.y_offset = 0;
+
+	Rga_Request.sina = 0;
+	Rga_Request.cosa = 0x10000;
+		
+    
+ 	ALOGV("dst info: yrgb_addr=%x, uv_addr=%x,v_addr=%x,"
+         "vir_w=%d,vir_h=%d,format=%d,"
+         "clip[%d,%d,%d,%d], "
+         "act_x_y_w_h [%d,%d,%d,%d] ",
+         
+			Rga_Request.dst.yrgb_addr, Rga_Request.dst.uv_addr ,Rga_Request.dst.v_addr,
+			Rga_Request.dst.vir_w ,Rga_Request.dst.vir_h ,Rga_Request.dst.format,
+			Rga_Request.clip.xmin,
+			Rga_Request.clip.xmax,
+			Rga_Request.clip.ymin,
+			Rga_Request.clip.ymax,
+			Rga_Request.dst.x_offset ,
+			Rga_Request.dst.y_offset,
+			Rga_Request.dst.act_w ,
+			Rga_Request.dst.act_h
+                 
+        );
+  
+	Rga_Request.scale_mode = 1;
+	Rga_Request.rotate_mode = 1;
+    //Rga_Request.render_mode = pre_scaling_mode;
+   // Rga_Request.alpha_rop_flag |= (1 << 5);
+
+   	Rga_Request.mmu_info.mmu_en    = 1;
+   	Rga_Request.mmu_info.mmu_flag  = ((2 & 0x3) << 4) | 1;
+                             
+
+	//gettimeofday(&tpend1,NULL);
+	if(ioctl(fd_rga, RGA_BLIT_SYNC, &Rga_Request) != 0)
+	{
+		ALOGE("%s(%d):  RGA_BLIT_ASYNC Failed", __FUNCTION__, __LINE__);
+	}
+	//else
+	//{
+		//LastBuffAddr = srcandle->base;
+	//}
+
+		
+	//gettimeofday(&tpend2,NULL);
+	//usec1 = 1000*(tpend2.tv_sec - tpend1.tv_sec) + (tpend2.tv_usec- tpend1.tv_usec)/1000;  
+	//LOGD("yuv to rga use time=%ld ms",usec1);	
+
+
+#if 0
+	static int blitcount = 0;
+	char pro_value[16];	
+	property_get("sys.dump",pro_value,0);
+
+	if(!strcmp(pro_value,"true") && blitcount < 5)
+	{
+		FILE * pfile = NULL;
+		char layername[100] ;
+		blitcount ++ ;
+		
+		//mkdir( "/data/",777);	
+		sprintf(layername,"/data/dumpvo%d.bin",blitcount);				
+		pfile = fopen(layername,"wb");
+		if(pfile)
+		{
+			fwrite((const void *)srcandle->base,(size_t)(2 * Rga_Request.dst.vir_w  * Rga_Request.dst.vir_h),1,pfile);
+			fclose(pfile);
+		}
+
+   	}
+#endif
+            
+}
+void DisplayHardware::SetLastBuffAddr( int value) const
+{
+	LastBuffAddr = value;
+}
+#endif
 
 uint32_t DisplayHardware::getFlags() const
 {

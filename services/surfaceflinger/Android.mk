@@ -19,7 +19,7 @@ LOCAL_SRC_FILES:= \
     
 
 LOCAL_CFLAGS:= -DLOG_TAG=\"SurfaceFlinger\"
-LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
+LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES -fpermissive
 
 ifeq ($(TARGET_BOARD_PLATFORM), omap3)
 	LOCAL_CFLAGS += -DNO_RGBX_8888
@@ -35,6 +35,8 @@ endif
 ifeq ($(TARGET_DISABLE_TRIPLE_BUFFERING), true)
 	LOCAL_CFLAGS += -DTARGET_DISABLE_TRIPLE_BUFFERING
 endif
+
+
 
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
@@ -53,6 +55,21 @@ ifneq ($(TARGET_BUILD_PDK), true)
 	LOCAL_SRC_FILES += DdmConnection.cpp
 endif
 
+
+ifeq ($(strip $(TARGET_BOARD_HARDWARE)),rk30board)	
+LOCAL_C_INCLUDES += hardware/rk29/libgralloc_ump/ump/include
+LOCAL_CFLAGS += -DTARGET_RK30
+ifeq ($(strip $(TARGET_BOARD_PLATFORM)),rk30xxb)	
+LOCAL_CFLAGS += -DTARGET_BOARD_PLATFORM_RK30XXB
+endif
+else
+ifeq ($(strip $(TARGET_BOARD_HARDWARE)),rk2928board)
+LOCAL_C_INCLUDES += hardware/rk29/libgralloc_ump/ump/include
+LOCAL_CFLAGS += -DTARGET_RK30
+else
+LOCAL_C_INCLUDES += hardware/libhardware/modules/gralloc
+endif
+endif
 LOCAL_MODULE:= libsurfaceflinger
 
 include $(BUILD_SHARED_LIBRARY)

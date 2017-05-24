@@ -121,6 +121,7 @@ public:
     status_t    unfreeze(SurfaceID id);
     status_t    setFlags(SurfaceID id, uint32_t flags, uint32_t mask);
     status_t    setTransparentRegionHint(SurfaceID id, const Region& transparent);
+    status_t    setInvisiableRegionScreenHint(SurfaceID id, const Region& invisiableRegionScreen);//rk add
     status_t    setLayer(SurfaceID id, int32_t layer);
     status_t    setAlpha(SurfaceID id, float alpha=1.0f);
     status_t    setFreezeTint(SurfaceID id, uint32_t tint);

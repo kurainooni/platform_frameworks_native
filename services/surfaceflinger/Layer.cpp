@@ -130,6 +130,11 @@ void Layer::onFrameQueued() {
 // in the purgatory list
 void Layer::onRemoved()
 {
+    if (strcmp(getName().string(),"view.wallpaper.live")==0)
+    {
+       ALOGD("onRemoved@layer view.wallpaper.live usleep 100ms");
+       usleep(100000);
+    }
     mSurfaceTexture->abandon();
 }
 
@@ -205,7 +210,7 @@ status_t Layer::setBuffers( uint32_t w, uint32_t h,
     mProtectedByApp = (flags & ISurfaceComposer::eProtectedByApp) ? true : false;
     mOpaqueLayer = (flags & ISurfaceComposer::eOpaque);
     mCurrentOpacity = getOpacityForFormat(format);
-
+    mTreatTransparentAsInvisiable = (flags & ISurfaceComposer::eTransparentAsInvisiable);//rk add
     mSurfaceTexture->setDefaultBufferSize(w, h);
     mSurfaceTexture->setDefaultBufferFormat(format);
     mSurfaceTexture->setConsumerUsageBits(getEffectiveUsage(0));
@@ -217,7 +222,16 @@ status_t Layer::setBuffers( uint32_t w, uint32_t h,
 
     return NO_ERROR;
 }
-
+//>>>>>add by qiuen
+bool Layer::isTreatTransparentAsInvisiable() const
+{
+    if (mActiveBuffer == 0) {
+        return false;
+    }
+   
+    return mTreatTransparentAsInvisiable;
+}
+//<<<<<
 Rect Layer::computeBufferCrop() const {
     // Start with the SurfaceTexture's buffer crop...
     Rect crop;
@@ -255,7 +269,7 @@ Rect Layer::computeBufferCrop() const {
         crop.right -= int(ceilf(float(winWidth - winCrop.right) * xScale));
         crop.bottom -= int(ceilf(float(winHeight - winCrop.bottom) * yScale));
     }
-
+   
     return crop;
 }
 
@@ -312,11 +326,11 @@ void Layer::setPerFrameData(hwc_layer_t* hwcl) {
         hwcl->handle = buffer->handle;
     }
 }
+    static int temp ;
 
 void Layer::onDraw(const Region& clip) const
 {
     ATRACE_CALL();
-
     if (CC_UNLIKELY(mActiveBuffer == 0)) {
         // the texture has not been created yet, this Layer has
         // in fact never been drawn into. This happens frequently with
@@ -376,6 +390,85 @@ void Layer::onDraw(const Region& clip) const
         glEnable(GL_TEXTURE_2D);
     }
 
+     const Layer::State& s(drawingState());
+   //>>>>>>>>>>>>>>add by qiuen
+    if (invisiableRegionScreen.getBounds().getHeight()>0)
+     {
+	Point lt,rb;
+	const Rect& crop(s.active.crop);
+	visibleRegionScreen.subtractSelf(this->invisiableRegionScreen);
+
+	lt.x = 0;
+	lt.y = s.active.h-visibleRegionScreen.getBounds().getHeight();  
+	crop.setLeftTop(lt);
+	rb.x = s.active.w;
+	rb.y = s.active.h;
+	crop.setRightBottom(rb);
+        GLfloat   vertices[4][2];
+	const Transform tr(mTransform);
+	const bool transformed = tr.transformed();
+	const DisplayHardware& hw(graphicPlane(0).displayHardware());
+	const uint32_t hw_h = hw.getHeight();
+        const uint32_t hw_w = hw.getWidth();
+	if (tr.getOrientation() & Transform::ROT_90)
+	{
+		if ((tr.getOrientation() & Transform::FLIP_H) && (tr.getOrientation() &Transform::FLIP_V) )
+		{
+			lt.y = s.active.h-visibleRegionScreen.getBounds().getWidth();  
+			crop.setLeftTop(lt);
+			vertices[2][0] = visibleRegionScreen.getBounds().right ;
+			vertices[2][1] = visibleRegionScreen.getBounds().top;
+			vertices[3][0] = visibleRegionScreen.getBounds().left ;
+			vertices[3][1] = visibleRegionScreen.getBounds().top;
+			vertices[0][0] = visibleRegionScreen.getBounds().left ;
+			vertices[0][1] = visibleRegionScreen.getBounds().bottom;
+			vertices[1][0] = visibleRegionScreen.getBounds().right ;
+			vertices[1][1] = visibleRegionScreen.getBounds().bottom;
+			
+		}
+		else
+		{
+			lt.y = s.active.h-visibleRegionScreen.getBounds().getWidth();  
+			crop.setLeftTop(lt);
+			vertices[0][0] = visibleRegionScreen.getBounds().right ;
+			vertices[0][1] = visibleRegionScreen.getBounds().top;
+			vertices[1][0] = visibleRegionScreen.getBounds().left;
+			vertices[1][1] = visibleRegionScreen.getBounds().top;
+			vertices[2][0] = visibleRegionScreen.getBounds().left ;
+			vertices[2][1] = visibleRegionScreen.getBounds().bottom;
+			vertices[3][0] = visibleRegionScreen.getBounds().right ;
+			vertices[3][1] = visibleRegionScreen.getBounds().bottom;
+		}
+	}
+	else
+	{
+   	  if ((tr.getOrientation() & Transform::FLIP_H) && (tr.getOrientation() &Transform::FLIP_V) )
+	  {
+	      vertices[0][0] = visibleRegionScreen.getBounds().right ;
+	      vertices[0][1] = visibleRegionScreen.getBounds().bottom;
+	      vertices[1][0] = visibleRegionScreen.getBounds().right ;
+	      vertices[1][1] = visibleRegionScreen.getBounds().top;
+              vertices[2][0] = visibleRegionScreen.getBounds().left ;
+	      vertices[2][1] = visibleRegionScreen.getBounds().top;
+	      vertices[3][0] = visibleRegionScreen.getBounds().left ;
+	      vertices[3][1] = visibleRegionScreen.getBounds().bottom;
+   	  }
+	  else
+	  {
+		vertices[0][0] = visibleRegionScreen.getBounds().left;
+		vertices[0][1] = visibleRegionScreen.getBounds().top;
+		vertices[1][0] = visibleRegionScreen.getBounds().left;
+		vertices[1][1] = visibleRegionScreen.getBounds().bottom;
+		vertices[2][0] = visibleRegionScreen.getBounds().right;
+		vertices[2][1] = visibleRegionScreen.getBounds().bottom;
+		vertices[3][0] = visibleRegionScreen.getBounds().right;
+		vertices[3][1] = visibleRegionScreen.getBounds().top;
+	  }
+	}
+
+	setVertices(vertices);
+     }
+    //<<<<<<<<<<<
     drawWithOpenGL(clip);
 
     glDisable(GL_TEXTURE_EXTERNAL_OES);

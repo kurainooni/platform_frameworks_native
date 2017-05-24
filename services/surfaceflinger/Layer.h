@@ -71,6 +71,8 @@ public:
     virtual void lockPageFlip(bool& recomputeVisibleRegions);
     virtual void unlockPageFlip(const Transform& planeTransform, Region& outDirtyRegion);
     virtual bool isOpaque() const;
+   virtual bool isTreatTransparentAsInvisiable() const;//add by qiuen
+
     virtual bool needsDithering() const     { return mNeedsDithering; }
     virtual bool isSecure() const           { return mSecure; }
     virtual bool isProtected() const;
@@ -102,6 +104,7 @@ private:
     uint32_t getTransformHint() const;
     bool isCropped() const;
     Rect computeBufferCrop() const;
+    bool mTreatTransparentAsInvisiable;//also see isTreatTransparentAsInvisiable();add by rk
     static bool getOpacityForFormat(uint32_t format);
 
     // -----------------------------------------------------------------------

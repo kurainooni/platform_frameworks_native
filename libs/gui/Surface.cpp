@@ -146,6 +146,15 @@ status_t SurfaceControl::setTransparentRegionHint(const Region& transparent) {
     const sp<SurfaceComposerClient>& client(mClient);
     return client->setTransparentRegionHint(mToken, transparent);
 }
+
+status_t SurfaceControl::setInvisiableRegionScreenHint(const Region& invisiable){
+       //rk add
+       status_t err = validate();
+    if (err < 0) return err;
+    const sp<SurfaceComposerClient>& client(mClient);
+    return client->setInvisiableRegionScreenHint(mToken, invisiable);
+}
+
 status_t SurfaceControl::setAlpha(float alpha) {
     status_t err = validate();
     if (err < 0) return err;

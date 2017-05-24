@@ -89,7 +89,11 @@ BufferQueue::BufferQueue(  bool allowSynchronousMode, int bufferCount ) :
     mMinAsyncBufferSlots(bufferCount + 1),
     mMinSyncBufferSlots(bufferCount),
     mBufferCount(mMinAsyncBufferSlots),
+#ifdef TARGET_RK30    
     mClientBufferCount(0),
+#else
+ 	mClientBufferCount(3),
+#endif
     mServerBufferCount(mMinAsyncBufferSlots),
     mSynchronousMode(false),
     mAllowSynchronousMode(allowSynchronousMode),
@@ -649,6 +653,13 @@ status_t BufferQueue::queueBuffer(int buf,
     }
     return OK;
 }
+
+//>>>>add by qiuen
+uint64_t BufferQueue::getFrameCounter()
+{
+    return mFrameCounter;
+}
+//<<<<
 
 void BufferQueue::cancelBuffer(int buf) {
     ATRACE_CALL();

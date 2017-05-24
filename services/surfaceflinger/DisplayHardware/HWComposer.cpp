@@ -205,6 +205,11 @@ status_t HWComposer::commit() const {
     return (status_t)err;
 }
 
+status_t HWComposer::overlayClose() const{
+    int rc = mHwc->overlayclose();
+    return rc;
+}
+
 status_t HWComposer::release() const {
     if (mHwc) {
         if (mHwc->common.version >= HWC_DEVICE_API_VERSION_0_3) {

@@ -70,6 +70,12 @@ static const extention_map_t sExtentionMap[] = {
             (__eglMustCastToProperFunctionPointerType)&eglCreateImageKHR },
     { "eglDestroyImageKHR",
             (__eglMustCastToProperFunctionPointerType)&eglDestroyImageKHR },
+    { "eglGetRenderBufferANDROID",
+            (__eglMustCastToProperFunctionPointerType)&eglGetRenderBufferANDROID }, 
+    { "eglRenderBufferModifiedANDROID",
+            (__eglMustCastToProperFunctionPointerType)&eglRenderBufferModifiedANDROID },
+    { "eglSetImplementationAndroid",
+            (__eglMustCastToProperFunctionPointerType)&eglSetImplementationAndroid },
     { "eglGetSystemTimeFrequencyNV",
             (__eglMustCastToProperFunctionPointerType)&eglGetSystemTimeFrequencyNV },
     { "eglGetSystemTimeNV",
@@ -1191,6 +1197,50 @@ EGLBoolean eglGetSyncAttribKHR(EGLDisplay dpy, EGLSyncKHR sync,
 // ----------------------------------------------------------------------------
 
 /* ANDROID extensions entry-point go here */
+
+// add by cf
+EGLClientBuffer eglGetRenderBufferANDROID(EGLDisplay dpy, EGLSurface draw)
+{
+    clearError();
+
+    //if (!validate_display(dpy)) return EGL_FALSE;
+
+    //SurfaceRef _s(draw);
+    //if (!_s.get())
+    //    return setError(EGL_BAD_SURFACE, EGL_FALSE);
+
+ 
+    egl_display_ptr   const dp = get_display(dpy);
+    egl_surface_t const * const s = get_surface(draw);
+    if (s->cnx->egl.eglGetRenderBufferANDROID) {
+	        return s->cnx->egl.eglGetRenderBufferANDROID(
+		                dp->disp.dpy, s->surface);		                  
+	    }
+	    return setError(EGL_BAD_DISPLAY, (EGLClientBuffer*)0);
+}
+
+//EGLBoolean eglRenderBufferModifiedANDROID(EGLDisplay dpy, EGLSurface draw){
+  //  return EGL_TRUE;
+//}
+
+EGLBoolean eglRenderBufferModifiedANDROID(EGLDisplay dpy, EGLSurface draw){
+
+    clearError();
+    egl_display_ptr  const dp = get_display(dpy);
+    egl_surface_t const * const s = get_surface(draw);
+    if (s->cnx->egl.eglGetRenderBufferANDROID) {
+            return s->cnx->egl.eglRenderBufferModifiedANDROID(
+                        dp->disp.dpy, s->surface);
+    }
+    return EGL_TRUE;
+}
+
+
+void eglSetImplementationAndroid(EGLBoolean impl)
+{
+	//gEGLImplSWOnly = impl;
+}
+
 
 // ----------------------------------------------------------------------------
 // NVIDIA extensions

@@ -117,6 +117,9 @@ public:
     status_t setTransparentRegionHint(
             const sp<SurfaceComposerClient>& client, SurfaceID id,
             const Region& transparentRegion);
+	status_t setInvisiableRegionScreenHint(const sp<SurfaceComposerClient>& client, SurfaceID id,
+            const Region& invisiableRegionScreen);
+
     status_t setAlpha(const sp<SurfaceComposerClient>& client, SurfaceID id,
             float alpha);
     status_t setMatrix(const sp<SurfaceComposerClient>& client, SurfaceID id,
@@ -157,7 +160,7 @@ void Composer::closeGlobalTransactionImpl(bool synchronous) {
         }
         mForceSynchronous = false;
     }
-
+   
    sm->setTransactionState(transaction, orientation, flags);
 }
 
@@ -270,6 +273,21 @@ status_t Composer::setMatrix(const sp<SurfaceComposerClient>& client,
     s->matrix = matrix;
     return NO_ERROR;
 }
+
+// rk add
+status_t Composer::setInvisiableRegionScreenHint(
+            const sp<SurfaceComposerClient>& client, SurfaceID id,
+            const Region& invisiableRegionScreen) {
+    Mutex::Autolock _l(mLock);
+    layer_state_t* s = getLayerStateLocked(client, id);
+    if (!s)
+        return BAD_INDEX;
+    s->what |= ISurfaceComposer::eInvisiableRegionScreenChanged;
+    s->invisiableRegionScreen = invisiableRegionScreen;
+
+    return NO_ERROR;
+}
+//<<<<
 
 status_t Composer::setFreezeTint(const sp<SurfaceComposerClient>& client,
         SurfaceID id, uint32_t tint) {
@@ -460,9 +478,20 @@ status_t SurfaceComposerClient::setFlags(SurfaceID id, uint32_t flags,
     return getComposer().setFlags(this, id, flags, mask);
 }
 
+ status_t setInvisiableRegionScreenHint(
+          const sp<SurfaceComposerClient>& client, SurfaceID id,
+          const Region& invisiableRegionScreen);//rk add   
+
 status_t SurfaceComposerClient::setTransparentRegionHint(SurfaceID id,
         const Region& transparentRegion) {
     return getComposer().setTransparentRegionHint(this, id, transparentRegion);
+}
+
+//rk add
+status_t SurfaceComposerClient::setInvisiableRegionScreenHint(SurfaceID id,
+        const Region& invisiableRegionScreen) {
+
+    return getComposer().setInvisiableRegionScreenHint(this, id, invisiableRegionScreen);
 }
 
 status_t SurfaceComposerClient::setAlpha(SurfaceID id, float alpha) {

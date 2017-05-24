@@ -175,11 +175,11 @@ status_t SurfaceTexture::setDefaultBufferSize(uint32_t w, uint32_t h)
     return mBufferQueue->setDefaultBufferSize(w, h);
 }
 
-status_t SurfaceTexture::updateTexImage() {
-    return SurfaceTexture::updateTexImage(NULL);
+status_t SurfaceTexture::updateTexImage(bool checkFirstFrame) {
+    return SurfaceTexture::updateTexImage(NULL,checkFirstFrame);
 }
 
-status_t SurfaceTexture::updateTexImage(BufferRejecter* rejecter) {
+status_t SurfaceTexture::updateTexImage(BufferRejecter* rejecter, bool checkFirstFrame) {
     ATRACE_CALL();
     ST_LOGV("updateTexImage");
     Mutex::Autolock lock(mMutex);
@@ -322,6 +322,12 @@ status_t SurfaceTexture::updateTexImage(BufferRejecter* rejecter) {
         }
         // We always bind the texture even if we don't update its contents.
         glBindTexture(mTexTarget, mTexName);
+	//>>>>>add by qiuen
+	if (mBufferQueue->getFrameCounter()==0 && checkFirstFrame)
+	{
+		return BAD_VALUE;
+	}
+	//<<<<<<
         return OK;
     }
 
